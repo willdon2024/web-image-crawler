@@ -8,13 +8,6 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
     const progressText = document.getElementById('progressText');
     const progressNumbers = document.getElementById('progressNumbers');
     const currentPhase = document.getElementById('currentPhase');
-    const submitButton = document.querySelector('button[type="submit"]');
-    const urlInput = document.getElementById('url');
-    
-    // 禁用输入和提交按钮
-    submitButton.disabled = true;
-    urlInput.disabled = true;
-    submitButton.style.opacity = '0.5';
     
     // 清除之前的内容和状态
     loading.style.display = 'block';
@@ -144,7 +137,8 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             </button>
             <span class="selection-info">已选择: 0/${imageUrls.length} 张图片</span>
         `;
-        imageGrid.parentNode.insertBefore(selectionControls, imageGrid);
+        const resultContainer = document.querySelector('.result-container');
+        resultContainer.insertBefore(selectionControls, resultContainer.firstChild);
 
         // 选择状态管理
         const selectedImages = new Set();
@@ -247,12 +241,19 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
         const results = await Promise.all(loadPromises);
         const successUrls = results.filter(url => url !== null);
 
+        // 添加下载按钮（放在最前面）
+        const downloadBtn = document.createElement('button');
+        downloadBtn.className = 'btn btn-success';
+        downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载已选图片 (0/${successUrls.length}张)`;
+        downloadBtn.disabled = true;
+        downloadBtn.style.opacity = '0.5';
+        
+        // 将下载按钮插入到图片网格之前
+        resultContainer.insertBefore(downloadBtn, selectionControls);
+
         // 更新选择控制按钮的计数
-        const selectionControlsElement = document.querySelector('.selection-controls');
-        if (selectionControlsElement) {
-            const info = selectionControlsElement.querySelector('.selection-info');
-            info.textContent = `已选择: 0/${successUrls.length} 张图片`;
-        }
+        const info = selectionControls.querySelector('.selection-info');
+        info.textContent = `已选择: 0/${successUrls.length} 张图片`;
 
         // 更新进度显示为实际成功加载的图片数量
         progressBar.style.width = '100%';
@@ -260,89 +261,10 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
         progressNumbers.textContent = `${successUrls.length}/${successUrls.length}`;
         currentPhase.innerHTML = '<i class="fas fa-check-circle"></i> 加载完成';
 
-        // 添加下载按钮
-        if (successUrls.length > 0) {
-            const downloadBtn = document.createElement('button');
-            downloadBtn.className = 'btn btn-success';
-            downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载已选图片 (0/${successUrls.length}张)`;
-            downloadBtn.disabled = true;
-            downloadBtn.style.opacity = '0.5';
-            imageGrid.parentNode.appendChild(downloadBtn);
-
-            // 下载功能
-            downloadBtn.addEventListener('click', async () => {
-                if (selectedImages.size === 0) return;
-                
-                // 禁用下载按钮和选择控制
-                downloadBtn.disabled = true;
-                downloadBtn.style.opacity = '0.5';
-                const selectionControls = document.querySelector('.selection-controls');
-                if (selectionControls) {
-                    const buttons = selectionControls.querySelectorAll('button');
-                    buttons.forEach(btn => {
-                        btn.disabled = true;
-                        btn.style.opacity = '0.5';
-                    });
-                }
-
-                try {
-                    currentPhase.innerHTML = '<i class="fas fa-download"></i> 正在下载图片...';
-                    progressBar.style.width = '0%';
-                    progressText.textContent = '准备下载...';
-                    progressNumbers.textContent = `0/${selectedImages.size}`;
-                    
-                    let downloadedCount = 0;
-                    for (const imageUrl of selectedImages) {
-                        try {
-                            const response = await fetch(imageUrl);
-                            const blob = await response.blob();
-                            const link = document.createElement('a');
-                            link.href = URL.createObjectURL(blob);
-                            link.download = imageUrl.split('/').pop() || 'image.jpg';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(link.href);
-                            
-                            downloadedCount++;
-                            const progress = (downloadedCount / selectedImages.size) * 100;
-                            progressBar.style.width = progress + '%';
-                            progressText.textContent = '正在下载图片';
-                            progressNumbers.textContent = `${downloadedCount}/${selectedImages.size}`;
-                        } catch (error) {
-                            console.error('下载图片失败:', error);
-                        }
-                    }
-                    
-                    currentPhase.innerHTML = '<i class="fas fa-check-circle"></i> 下载完成';
-                    progressText.textContent = '下载完成';
-                    
-                } catch (error) {
-                    currentPhase.innerHTML = '<i class="fas fa-exclamation-circle"></i> 下载出错';
-                    console.error('下载过程出错:', error);
-                } finally {
-                    // 重新启用下载按钮和选择控制
-                    downloadBtn.disabled = false;
-                    downloadBtn.style.opacity = '1';
-                    if (selectionControls) {
-                        const buttons = selectionControls.querySelectorAll('button');
-                        buttons.forEach(btn => {
-                            btn.disabled = false;
-                            btn.style.opacity = '1';
-                        });
-                    }
-                }
-            });
-        }
-
     } catch (error) {
         imageGrid.innerHTML = `<p class="text-center text-danger">发生错误: ${error.message}</p>`;
         currentPhase.innerHTML = '<i class="fas fa-exclamation-circle"></i> 发生错误';
     } finally {
         loading.style.display = 'none';
-        // 重新启用输入和提交按钮
-        submitButton.disabled = false;
-        urlInput.disabled = false;
-        submitButton.style.opacity = '1';
     }
 }); 
