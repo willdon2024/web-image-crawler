@@ -1,97 +1,301 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>图片爬虫测试</title>
+    <title>Will的抓图小工具</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+            margin: 0;
             padding: 20px;
+            background: #f5f5f5;
         }
-        .test-form {
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            margin: 0;
+        }
+        .input-section {
+            display: flex;
+            gap: 10px;
             margin-bottom: 20px;
         }
-        .result {
-            white-space: pre-wrap;
-            background: #f5f5f5;
-            padding: 10px;
-            border-radius: 4px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
         #urlInput {
-            width: 100%;
-            padding: 8px;
-            margin: 10px 0;
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
         }
-        button {
-            padding: 8px 16px;
-            background: #4CAF50;
+        #urlInput:focus {
+            border-color: #2196F3;
+            outline: none;
+        }
+        .main-button {
+            padding: 12px 24px;
+            background: #2196F3;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 10px;
+            font-size: 16px;
+            transition: background 0.3s;
         }
-        button:hover {
-            background: #45a049;
+        .main-button:hover {
+            background: #1976D2;
         }
-        .preset-urls {
-            margin: 20px 0;
+        .main-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .results-section {
+            margin-top: 20px;
+            display: none;
+        }
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
             padding: 10px;
-            background: #f0f0f0;
+            background: #f8f9fa;
             border-radius: 4px;
         }
-        .preset-urls button {
-            margin: 5px;
-            background: #2196F3;
+        .stats {
+            display: flex;
+            gap: 20px;
         }
-        .preset-urls button:hover {
-            background: #1976D2;
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2196F3;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+        .images-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .image-item {
+            position: relative;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+            padding: 5px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .image-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .image-item.selected {
+            border: 2px solid #2196F3;
+            background: #e3f2fd;
+        }
+        .image-checkbox {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            z-index: 1;
+            opacity: 0;
+        }
+        .image-item::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            z-index: 1;
+        }
+        .image-item.selected::before {
+            background: #2196F3 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>') center/14px no-repeat;
+        }
+        .image-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2196F3;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            display: none;
+            color: #dc3545;
+            padding: 10px;
+            background: #f8d7da;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .download-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .download-bar.visible {
+            display: flex;
+        }
+        .download-info {
+            color: #666;
+        }
+        .download-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .select-all-btn {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .download-selected-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .download-selected-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body>
-    <h1>图片爬虫测试</h1>
-    <div class="test-form">
-        <input type="text" id="urlInput" placeholder="输入要爬取的网页URL">
-        <button onclick="fetchImages()">开始爬取</button>
-    </div>
-    
-    <div class="preset-urls">
-        <h3>测试网址：</h3>
-        <button onclick="setUrl('https://pixabay.com')">Pixabay图片网站</button>
-        <button onclick="setUrl('https://www.pexels.com')">Pexels图片网站</button>
-        <button onclick="setUrl('https://www.nasa.gov/multimedia/imagegallery')">NASA图片库</button>
-        <button onclick="setUrl('https://500px.com/popular')">500px热门图片</button>
-        <button onclick="setUrl('https://www.nationalgeographic.com/photography')">国家地理摄影</button>
-        <h3>新闻网站测试：</h3>
-        <button onclick="setUrl('https://www.bbc.com')">BBC新闻</button>
-        <button onclick="setUrl('https://www.theverge.com')">The Verge</button>
-        <button onclick="setUrl('https://www.engadget.com')">Engadget</button>
-    </div>
+    <div class="container">
+        <div class="header">
+            <h1>Will的抓图小工具</h1>
+            <p>输入网页URL，一键提取所有图片资源</p>
+        </div>
 
-    <div id="result" class="result"></div>
+        <div class="input-section">
+            <input type="text" id="urlInput" placeholder="请输入网页URL（例如：https://www.example.com）" />
+            <button onclick="fetchImages()" class="main-button" id="fetchButton">开始提取</button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>正在提取图片，请稍候...</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="results-section" id="results">
+            <div class="results-header">
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalImages">0</div>
+                        <div class="stat-label">总图片数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="processTime">0</div>
+                        <div class="stat-label">处理时间(ms)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="images-grid" id="imagesGrid"></div>
+        </div>
+
+        <div class="download-bar" id="downloadBar">
+            <div class="download-info">
+                已选择 <span id="selectedCount">0</span> 张图片
+            </div>
+            <div class="download-actions">
+                <button class="select-all-btn" onclick="toggleSelectAll()">全选</button>
+                <button class="download-selected-btn" onclick="downloadSelected()" id="downloadBtn">打包下载选中图片</button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        function setUrl(url) {
-            document.getElementById('urlInput').value = url;
-        }
+        // 添加全局变量
+        const retryCount = 3;
 
         async function fetchImages() {
-            const url = document.getElementById('urlInput').value;
-            const resultDiv = document.getElementById('result');
+            const urlInput = document.getElementById('urlInput');
+            const fetchButton = document.getElementById('fetchButton');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const errorMessage = document.getElementById('errorMessage');
+            const imagesGrid = document.getElementById('imagesGrid');
             
+            const url = urlInput.value.trim();
             if (!url) {
-                resultDiv.textContent = '请输入URL';
+                showError('请输入有效的URL');
                 return;
             }
-            
-            resultDiv.textContent = '正在获取图片...';
-            
+
+            // 重置界面状态
+            fetchButton.disabled = true;
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            errorMessage.style.display = 'none';
+            imagesGrid.innerHTML = '';
+
             try {
-                const response = await fetch('http://localhost:3000/fetch-with-js', {
+                // 修改 API 地址配置
+                const apiUrl = 'http://localhost:3000/fetch-with-js';
+                console.log('正在请求:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -99,36 +303,293 @@
                     body: JSON.stringify({ url })
                 });
                 
+                console.log('服务器响应状态:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
-                    let output = `找到 ${data.stats.totalImages} 张图片\n`;
-                    output += `处理时间: ${data.stats.processingTimeMs}ms\n\n`;
-                    
-                    // 显示图片类型统计
-                    output += '图片类型统计:\n';
-                    for (const [type, count] of Object.entries(data.stats.byType)) {
-                        output += `${type}: ${count}张\n`;
+                    // 更新统计信息
+                    document.getElementById('totalImages').textContent = data.stats.totalImages;
+                    document.getElementById('processTime').textContent = data.stats.processingTimeMs;
+
+                    // 显示图片网格
+                    if (data.imageUrls && data.imageUrls.length > 0) {
+                        data.imageUrls.forEach((imageUrl, index) => {
+                            const imageItem = document.createElement('div');
+                            imageItem.className = 'image-item';
+                            
+                            // 确保图片URL是完整的
+                            const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${new URL(url).origin}${imageUrl}`;
+                            
+                            imageItem.innerHTML = `
+                                <input type="checkbox" class="image-checkbox" />
+                                <img src="${fullImageUrl}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22100%22 height=%22100%22><rect width=%22100%22 height=%22100%22 fill=%22%23ddd%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23666%22>加载失败</text></svg>'"/>
+                                <input type="hidden" class="image-url" value="${fullImageUrl}" />
+                            `;
+                            
+                            // 添加点击事件处理
+                            imageItem.addEventListener('click', function(e) {
+                                const checkbox = this.querySelector('.image-checkbox');
+                                checkbox.checked = !checkbox.checked;
+                                this.classList.toggle('selected', checkbox.checked);
+                                updateSelection();
+                            });
+                            
+                            imagesGrid.appendChild(imageItem);
+                        });
+                        
+                        // 显示下载栏
+                        document.getElementById('downloadBar').style.display = 'flex';
+                    } else {
+                        showError('未找到任何图片');
                     }
-                    
-                    // 显示域名统计
-                    output += '\n域名统计:\n';
-                    for (const [domain, count] of Object.entries(data.stats.byDomain)) {
-                        output += `${domain}: ${count}张\n`;
-                    }
-                    
-                    // 显示所有图片URL
-                    output += '\n图片URL列表:\n';
-                    data.imageUrls.forEach((url, index) => {
-                        output += `${index + 1}. ${url}\n`;
-                    });
-                    
-                    resultDiv.textContent = output;
+
+                    results.style.display = 'block';
                 } else {
-                    resultDiv.textContent = `错误: ${data.error}\n详细信息: ${JSON.stringify(data.details, null, 2)}`;
+                    showError(data.error || '提取失败');
                 }
             } catch (error) {
-                resultDiv.textContent = `请求失败: ${error.message}`;
+                console.error('Error:', error);
+                showError('请求失败: ' + (error.message || '未知错误'));
+            } finally {
+                fetchButton.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                alert('链接已复制到剪贴板');
+            } catch (err) {
+                console.error('复制失败:', err);
+            }
+        }
+
+        // 支持回车键提交
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchImages();
+            }
+        });
+
+        // 更新选中的图片数量
+        function updateSelection() {
+            const selectedImages = document.querySelectorAll('.image-checkbox:checked');
+            const selectedCount = selectedImages.length;
+            document.getElementById('selectedCount').textContent = selectedCount;
+            
+            // 更新下载按钮状态
+            document.getElementById('downloadBtn').disabled = selectedCount === 0;
+            
+            // 显示或隐藏下载栏
+            document.getElementById('downloadBar').style.display = selectedCount > 0 ? 'flex' : 'none';
+        }
+
+        // 更新全选/取消全选函数
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('.image-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+                checkbox.closest('.image-item').classList.toggle('selected', !allChecked);
+            });
+            
+            updateSelection();
+        }
+
+        // 更新图片下载函数
+        async function downloadImage(imageUrl, retries = 0) {
+            try {
+                // 处理相对URL
+                if (!imageUrl.startsWith('http')) {
+                    const urlInput = document.getElementById('urlInput');
+                    const baseUrl = new URL(urlInput.value.trim());
+                    imageUrl = new URL(imageUrl, baseUrl).href;
+                }
+
+                const response = await fetch(imageUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                        'Referer': new URL(imageUrl).origin
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // 获取响应数据
+                const buffer = await response.arrayBuffer();
+                
+                // 检查文件大小
+                if (buffer.byteLength === 0) {
+                    throw new Error('Empty file');
+                }
+
+                // 获取或推断内容类型
+                let contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.startsWith('image/')) {
+                    // 从URL推断内容类型
+                    const ext = imageUrl.split('.').pop().toLowerCase();
+                    switch (ext) {
+                        case 'jpg':
+                        case 'jpeg':
+                            contentType = 'image/jpeg';
+                            break;
+                        case 'png':
+                            contentType = 'image/png';
+                            break;
+                        case 'gif':
+                            contentType = 'image/gif';
+                            break;
+                        case 'webp':
+                            contentType = 'image/webp';
+                            break;
+                        default:
+                            contentType = 'image/jpeg';
+                    }
+                }
+
+                return {
+                    buffer: buffer,
+                    contentType: contentType
+                };
+            } catch (error) {
+                console.error(`Download error for ${imageUrl}:`, error);
+                if (retries < retryCount) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    return downloadImage(imageUrl, retries + 1);
+                }
+                throw error;
+            }
+        }
+
+        // 更新文件名生成逻辑
+        function getUniqueFilename(imageUrl, index, contentType) {
+            // 获取当前时间戳（精确到毫秒）
+            const timestamp = new Date().toISOString()
+                .replace(/[:.]/g, '-')
+                .replace('T', '_')
+                .replace('Z', '');
+            
+            // 从URL中提取原始文件名
+            let originalFilename = imageUrl.split('/').pop().split('?')[0];
+            
+            // 如果URL中没有有效的文件名，则根据内容类型生成
+            if (!originalFilename || originalFilename.trim() === '' || !originalFilename.includes('.')) {
+                const ext = contentType.split('/')[1] || 'jpg';
+                originalFilename = `image_${index + 1}.${ext}`;
+            }
+            
+            // 分离文件名和扩展名
+            const lastDotIndex = originalFilename.lastIndexOf('.');
+            const extension = originalFilename.substring(lastDotIndex + 1);
+            
+            // 生成文件名：时间戳_序号.扩展名
+            return `${timestamp}_${(index + 1).toString().padStart(3, '0')}.${extension}`;
+        }
+
+        // 更新下载处理逻辑
+        async function downloadSelected() {
+            const selectedImages = document.querySelectorAll('.image-checkbox:checked');
+            const totalImages = selectedImages.length;
+            
+            if (totalImages === 0) {
+                alert('请先选择要下载的图片');
+                return;
+            }
+            
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = '正在打包...';
+            
+            const progressDiv = document.createElement('div');
+            progressDiv.style.position = 'fixed';
+            progressDiv.style.bottom = '80px';
+            progressDiv.style.left = '50%';
+            progressDiv.style.transform = 'translateX(-50%)';
+            progressDiv.style.background = 'rgba(0,0,0,0.8)';
+            progressDiv.style.color = 'white';
+            progressDiv.style.padding = '10px 20px';
+            progressDiv.style.borderRadius = '4px';
+            progressDiv.style.zIndex = '1000';
+            document.body.appendChild(progressDiv);
+            
+            try {
+                const zip = new JSZip();
+                const imageFolder = zip.folder("images");
+                let successCount = 0;
+                const errors = [];
+                
+                for (let i = 0; i < selectedImages.length; i++) {
+                    const checkbox = selectedImages[i];
+                    const imageUrl = checkbox.closest('.image-item').querySelector('.image-url').value;
+                    
+                    progressDiv.textContent = `正在下载: ${i + 1}/${totalImages}`;
+                    
+                    try {
+                        const result = await downloadImage(imageUrl);
+                        const filename = `image_${(i + 1).toString().padStart(3, '0')}.${result.contentType.split('/')[1]}`;
+                        
+                        imageFolder.file(filename, result.buffer, { binary: true });
+                        successCount++;
+                        checkbox.closest('.image-item').style.backgroundColor = '#e8f5e9';
+                    } catch (error) {
+                        console.error('下载失败:', imageUrl, error);
+                        errors.push({ url: imageUrl, error: error.message });
+                        checkbox.closest('.image-item').style.backgroundColor = '#ffebee';
+                    }
+                }
+                
+                if (successCount > 0) {
+                    progressDiv.textContent = '正在生成压缩包...';
+                    
+                    const content = await zip.generateAsync({
+                        type: "blob",
+                        compression: "DEFLATE",
+                        compressionOptions: { level: 9 }
+                    }, function(metadata) {
+                        progressDiv.textContent = `正在打包: ${metadata.percent.toFixed(1)}%`;
+                    });
+                    
+                    const timestamp = new Date().toISOString()
+                        .replace(/[:.]/g, '-')
+                        .replace('T', '_')
+                        .replace('Z', '');
+                    const zipFilename = `images_${timestamp}.zip`;
+                    
+                    saveAs(content, zipFilename);
+                    
+                    if (errors.length > 0) {
+                        alert(`已打包 ${successCount} 张图片，${errors.length} 张图片下载失败。\n详细错误信息已在控制台输出。`);
+                    } else {
+                        alert(`已成功打包 ${successCount} 张图片！`);
+                    }
+                } else {
+                    alert('所有图片下载失败，请检查网络连接或图片地址是否可访问。');
+                }
+            } catch (error) {
+                console.error('打包过程出错:', error);
+                alert('打包过程出错: ' + error.message);
+            } finally {
+                if (document.body.contains(progressDiv)) {
+                    document.body.removeChild(progressDiv);
+                }
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '打包下载选中图片';
             }
         }
     </script>

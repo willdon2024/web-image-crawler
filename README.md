@@ -1,29 +1,36 @@
-# 高级网页图片爬虫
+# Will的抓图小工具
 
-一个功能强大的网页图片爬虫工具，支持多种图片提取方式和高级功能。
+一个强大的网页图片批量提取工具，支持多种图片提取方式和智能图片分析。
 
 ## 功能特点
 
-- 支持多种图片提取方式
-  - 静态HTML解析
-  - CSS背景图片提取
-  - 内联样式图片提取
-  - 动态加载图片识别
-  - CDN资源分析
+- 🚀 一键提取网页所有图片
+- 🖼️ 支持多种图片格式 (JPG, PNG, GIF, WebP)
+- 📦 批量打包下载选中图片
+- 🔍 智能分析图片资源
+- 🌐 支持相对路径和绝对路径
+- 🛡️ 自动处理跨域问题
+- 📱 响应式界面设计
+- ⚡ 异步并发下载
+- 🔄 失败重试机制
+- 💾 智能文件命名
 
-- 高级功能
-  - URL智能分析
-  - 域名统计
-  - 图片类型分类
-  - 性能统计
-  - 错误处理
+## 技术栈
+
+- Node.js
+- Express
+- HTML5
+- CSS3
+- JavaScript (ES6+)
+- JSZip
+- FileSaver.js
 
 ## 快速开始
 
 1. 克隆仓库
 ```bash
-git clone [repository-url]
-cd image-crawler
+git clone https://github.com/willdon2024/web-image-crawler.git
+cd web-image-crawler
 ```
 
 2. 安装依赖
@@ -36,46 +43,55 @@ npm install
 node server.js
 ```
 
-4. 打开测试页面
+4. 打开浏览器访问
 ```
-打开 test.html 文件在浏览器中进行测试
+http://localhost:3000
 ```
+
+## 使用方法
+
+1. 在输入框中输入目标网页URL
+2. 点击"开始提取"按钮
+3. 等待图片加载完成
+4. 点击选择需要下载的图片
+5. 点击"打包下载选中图片"按钮
 
 ## API 使用
 
 ### 提取图片
 
-POST `/fetch-with-js`
+```javascript
+POST /fetch-with-js
+Content-Type: application/json
 
-请求体:
-```json
 {
-    "url": "要爬取的网页URL"
+    "url": "https://example.com"
 }
 ```
 
-响应:
-```json
+响应格式：
+```javascript
 {
     "success": true,
-    "message": "成功提取图片URL",
-    "imageUrls": ["图片URL列表"],
+    "imageUrls": ["url1", "url2", ...],
     "stats": {
-        "totalImages": "总图片数",
-        "processingTimeMs": "处理时间",
-        "byType": "按类型统计",
-        "byDomain": "按域名统计"
+        "totalImages": 10,
+        "processingTimeMs": 1234
     }
 }
 ```
 
-## 技术栈
+## 注意事项
 
-- Node.js
-- 原生HTTP模块
-- 正则表达式
-- URL解析
+- 确保目标网站允许图片访问
+- 部分网站可能有反爬虫机制
+- 建议遵守网站的robots.txt规则
+- 下载图片时注意版权问题
 
 ## 许可证
 
-MIT
+MIT License - 详见 [LICENSE](LICENSE) 文件
+
+## 作者
+
+Will - [GitHub](https://github.com/willdon2024)

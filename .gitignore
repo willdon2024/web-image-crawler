@@ -9,6 +9,12 @@ yarn-error.log
 .env.local
 .env.*.local
 
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -18,8 +24,21 @@ yarn-error.log
 ehthumbs.db
 Thumbs.db
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo 
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache 
