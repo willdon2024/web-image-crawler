@@ -1,72 +1,44 @@
-# 网页图片下载工具
+# 网页图片爬虫工具
 
-一个简单易用的网页图片批量下载工具，支持通过Web界面操作。
+这是一个简单的网页图片爬虫工具，可以帮助你快速获取网页上的所有图片。该工具完全在浏览器端运行，无需后端服务器。
 
 ## 功能特点
 
-- 🌐 简洁的Web界面
-- 📥 批量下载网页中的所有图片
-- 📊 实时显示下载进度
-- 📦 自动打包为ZIP文件
-- 🚀 支持多人同时使用
-- 🧹 自动清理临时文件
+- 简洁的用户界面
+- 支持任意网页URL输入
+- 自动提取网页中的所有图片
+- 支持jpg、jpeg、png、gif格式
+- 图片预览和原图查看
+- 响应式布局，适配各种设备
 
-## 快速开始
+## 使用方法
 
-### 1. 克隆项目
+1. 访问工具网页
+2. 在输入框中粘贴要爬取的网页URL
+3. 点击"开始爬取"按钮
+4. 等待图片加载完成
+5. 点击任意图片可在新标签页中查看原图
 
-```bash
-git clone https://github.com/willdon2024/web-image-crawler.git
-cd web-image-crawler
-```
+## 技术说明
 
-### 2. 安装依赖
-
-```bash
-python3 -m pip install -r requirements.txt
-```
-
-### 3. 运行服务器
-
-```bash
-# 方法1：直接运行
-python3 app.py
-
-# 方法2：使用启动脚本
-chmod +x start.sh
-./start.sh
-```
-
-### 4. 使用方法
-
-1. 打开浏览器访问 `http://localhost:5000`
-2. 在输入框中输入要下载图片的网页地址
-3. 点击"开始下载"或按回车键
-4. 等待下载完成后点击"下载图片压缩包"
-
-## 技术栈
-
-- 后端：Python + Flask
-- 前端：HTML + JavaScript + Tailwind CSS
-- 爬虫：requests + BeautifulSoup4
-
-## 项目结构
-
-```
-.
-├── app.py              # 主程序
-├── requirements.txt    # 依赖列表
-├── start.sh           # 启动脚本
-└── templates
-    └── index.html     # 前端页面
-```
+- 使用纯前端技术实现，包括HTML、CSS和JavaScript
+- 使用Bootstrap 5框架实现响应式布局
+- 使用allorigins.win作为CORS代理，解决跨域问题
+- 使用浏览器原生的Fetch API进行网络请求
 
 ## 注意事项
 
-- 请确保你有权限下载目标网站的图片
-- 遵守网站的使用条款和robots.txt规则
-- 建议在本地网络或内网环境中使用
+- 由于跨域限制，部分网站可能无法爬取
+- 图片加载速度取决于目标网站和网络状况
+- 建议在现代浏览器中使用（Chrome、Firefox、Safari等）
 
-## 许可证
+## 部署方法
+
+1. 克隆本仓库到本地
+2. 将仓库推送到你的GitHub账号
+3. 在仓库设置中启用GitHub Pages
+4. 访问生成的GitHub Pages地址即可使用
+
+## License
 
 MIT License 
