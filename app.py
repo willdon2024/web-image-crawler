@@ -11,9 +11,6 @@ import json
 app = Flask(__name__)
 CORS(app)
 
-def create_app():
-    return app
-
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({"status": "ok", "message": "API is working"})
@@ -79,34 +76,96 @@ def crawl():
 
 def handler(event, context):
     """Handle Vercel serverless function invocation"""
-    flask_app = create_app()
-    
+    if not event:
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Invalid request'})
+        }
+
     # 从事件中获取请求信息
     path = event.get('path', '/')
     http_method = event.get('httpMethod', 'GET')
     headers = event.get('headers', {})
     body = event.get('body', '')
-    
-    # 创建 WSGI 环境
+
+    # 如果是 POST 请求，确保 body 是 JSON 格式
+    if http_method == 'POST' and body:
+        try:
+            if isinstance(body, str):
+                body = json.loads(body)
+        except json.JSONDecodeError:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({'error': 'Invalid JSON'})
+            }
+
+    # 创建请求环境
     environ = {
         'REQUEST_METHOD': http_method,
         'PATH_INFO': path,
-        'QUERY_STRING': event.get('queryStringParameters', ''),
-        'CONTENT_LENGTH': str(len(body) if body else ''),
-        'CONTENT_TYPE': headers.get('content-type', ''),
+        'QUERY_STRING': '',
+        'CONTENT_LENGTH': str(len(json.dumps(body)) if body else ''),
+        'CONTENT_TYPE': 'application/json',
         'wsgi.url_scheme': 'https',
-        'wsgi.input': io.StringIO(body if body else ''),
+        'wsgi.input': io.StringIO(json.dumps(body) if body else ''),
         'wsgi.errors': io.StringIO(),
         'wsgi.multithread': False,
         'wsgi.multiprocess': False,
         'wsgi.run_once': False,
+        'SERVER_NAME': 'vercel',
+        'SERVER_PORT': '443',
+        'SERVER_PROTOCOL': 'HTTP/1.1'
     }
-    
+
+    # 添加请求头
+    for key, value in headers.items():
+        key = key.upper().replace('-', '_')
+        if key not in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
+            environ[f'HTTP_{key}'] = value
+
     # 处理请求
-    response = flask_app.wsgi_app(environ, lambda s, h: None)
+    response_data = []
+    def start_response(status, response_headers, exc_info=None):
+        response_data.append({
+            'status': status,
+            'headers': response_headers
+        })
+
+    response_body = app.wsgi_app(environ, start_response)
+    response = response_data[0]
     
+    # 处理响应
+    status_code = int(response['status'].split()[0])
+    headers = dict(response['headers'])
+    
+    # 如果是文件下载响应
+    if headers.get('Content-Type') == 'application/zip':
+        try:
+            # 将响应体转换为 base64
+            import base64
+            body_data = b''.join(response_body)
+            body = base64.b64encode(body_data).decode('utf-8')
+            headers['Content-Transfer-Encoding'] = 'base64'
+            is_base64 = True
+        except Exception as e:
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': f'Error encoding file: {str(e)}'})
+            }
+    else:
+        # 普通 JSON 响应
+        try:
+            body = b''.join(response_body).decode('utf-8')
+            is_base64 = False
+        except Exception as e:
+            return {
+                'statusCode': 500,
+                'body': json.dumps({'error': f'Error decoding response: {str(e)}'})
+            }
+
     return {
-        'statusCode': response.status_code,
-        'headers': dict(response.headers),
-        'body': response.get_data(as_text=True)
+        'statusCode': status_code,
+        'headers': headers,
+        'body': body,
+        'isBase64Encoded': is_base64
     } 
