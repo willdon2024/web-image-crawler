@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import requests
 from bs4 import BeautifulSoup
@@ -130,126 +129,134 @@ def download_images(url):
         logger.error(f"处理过程中出错: {str(e)}")
         return None, str(e)
 
-def handle_request(event):
-    # 获取请求方法
-    method = event.get('httpMethod', 'GET')
-    
-    # 处理 OPTIONS 请求
-    if method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Max-Age': '86400'
-            },
-            'body': ''
-        }
-    
-    # 处理 GET 请求
-    if method == 'GET':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'status': 'ok',
-                'message': '图片下载 API 服务正常',
-                'usage': {
-                    'method': 'POST',
-                    'endpoint': '/api/crawl',
-                    'body': {
-                        'url': '要抓取的网页地址'
-                    },
-                    'response': {
-                        'success': '返回 ZIP 文件（base64编码）',
-                        'error': '返回错误信息'
+def handler(event, context):
+    """Vercel serverless function handler"""
+    try:
+        # 获取请求方法
+        method = event.get('httpMethod', 'GET')
+        
+        # 处理 OPTIONS 请求
+        if method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Max-Age': '86400'
+                },
+                'body': ''
+            }
+        
+        # 处理 GET 请求
+        if method == 'GET':
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({
+                    'status': 'ok',
+                    'message': '图片下载 API 服务正常',
+                    'usage': {
+                        'method': 'POST',
+                        'endpoint': '/api/crawl',
+                        'body': {
+                            'url': '要抓取的网页地址'
+                        },
+                        'response': {
+                            'success': '返回 ZIP 文件（base64编码）',
+                            'error': '返回错误信息'
+                        }
                     }
+                })
+            }
+        
+        # 处理 POST 请求
+        if method == 'POST':
+            try:
+                # 获取请求体
+                body = event.get('body', '')
+                if isinstance(body, str):
+                    data = json.loads(body)
+                else:
+                    data = body
+                    
+                # 验证URL
+                url = data.get('url')
+                if not url:
+                    return {
+                        'statusCode': 400,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        'body': json.dumps({'error': '请提供有效的URL'})
+                    }
+                    
+                # 下载图片
+                zip_data, error = download_images(url)
+                if error:
+                    return {
+                        'statusCode': 500,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*'
+                        },
+                        'body': json.dumps({'error': error})
+                    }
+                    
+                # 返回成功响应
+                return {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/zip',
+                        'Content-Transfer-Encoding': 'base64',
+                        'Access-Control-Allow-Origin': '*',
+                        'Content-Disposition': 'attachment; filename=images.zip'
+                    },
+                    'body': zip_data,
+                    'isBase64Encoded': True
                 }
-            })
-        }
-    
-    # 处理 POST 请求
-    if method == 'POST':
-        try:
-            # 获取请求体
-            body = event.get('body', '')
-            if isinstance(body, str):
-                data = json.loads(body)
-            else:
-                data = body
-                
-            # 验证URL
-            url = data.get('url')
-            if not url:
+                    
+            except json.JSONDecodeError:
                 return {
                     'statusCode': 400,
                     'headers': {
                         'Content-Type': 'application/json',
                         'Access-Control-Allow-Origin': '*'
                     },
-                    'body': json.dumps({'error': '请提供有效的URL'})
+                    'body': json.dumps({'error': '无效的JSON格式'})
                 }
-                
-            # 下载图片
-            zip_data, error = download_images(url)
-            if error:
+            except Exception as e:
+                logger.error(f"处理请求时出错: {str(e)}")
                 return {
                     'statusCode': 500,
                     'headers': {
                         'Content-Type': 'application/json',
                         'Access-Control-Allow-Origin': '*'
                     },
-                    'body': json.dumps({'error': error})
+                    'body': json.dumps({'error': f'服务器错误: {str(e)}'})
                 }
-                
-            # 返回成功响应
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Content-Type': 'application/zip',
-                    'Content-Transfer-Encoding': 'base64',
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Disposition': 'attachment; filename=images.zip'
-                },
-                'body': zip_data,
-                'isBase64Encoded': True
-            }
-                
-        except json.JSONDecodeError:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'error': '无效的JSON格式'})
-            }
-        except Exception as e:
-            logger.error(f"处理请求时出错: {str(e)}")
-            return {
-                'statusCode': 500,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({'error': f'服务器错误: {str(e)}'})
-            }
-    
-    # 不支持的请求方法
-    return {
-        'statusCode': 405,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Allow': 'GET, POST, OPTIONS'
-        },
-        'body': json.dumps({'error': f'不支持的请求方法: {method}'})
-    }
-
-def handler(event, context):
-    """Vercel serverless function handler"""
-    return handle_request(event) 
+        
+        # 不支持的请求方法
+        return {
+            'statusCode': 405,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Allow': 'GET, POST, OPTIONS'
+            },
+            'body': json.dumps({'error': f'不支持的请求方法: {method}'})
+        }
+    except Exception as e:
+        logger.error(f"处理请求时出错: {str(e)}")
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': f'服务器错误: {str(e)}'})
+        } 
