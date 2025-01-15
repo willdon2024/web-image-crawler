@@ -11,6 +11,9 @@
         :root {
             --primary-color: #4a90e2;
             --secondary-color: #f8f9fa;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
         }
         
         body {
@@ -109,27 +112,72 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
+        .progress-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+        }
+
+        .progress-status {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
         .progress {
-            height: 10px;
-            border-radius: 5px;
-            margin: 15px 0;
+            height: 8px;
+            border-radius: 4px;
             background-color: #e9ecef;
+            margin: 10px 0;
+            overflow: hidden;
         }
 
         .progress-bar {
             background-color: var(--primary-color);
+            transition: width 0.3s ease;
         }
 
-        #progressText {
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-top: 10px;
-            font-size: 0.9rem;
-            color: #6c757d;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .progress-phase {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+
+        .progress-numbers {
+            font-weight: 500;
+            color: var(--primary-color);
         }
 
         .btn-success {
+            background-color: var(--success-color);
+            border: none;
             border-radius: 10px;
             padding: 0.75rem 2rem;
             font-weight: 600;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
         }
 
         .footer {
@@ -138,15 +186,6 @@
             padding: 20px;
             color: #6c757d;
             font-size: 0.9rem;
-        }
-
-        .footer a {
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .footer a:hover {
-            text-decoration: underline;
         }
     </style>
 </head>
@@ -175,15 +214,20 @@
         </div>
 
         <div class="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
+            <div class="progress-container">
+                <div class="progress-phase">
+                    <i class="fas fa-sync-alt fa-spin"></i>
+                    <span id="currentPhase">正在获取网页内容...</span>
+                </div>
+                <div class="progress">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressText">准备开始...</span>
+                    <span class="progress-numbers" id="progressNumbers">0/0</span>
+                </div>
             </div>
-            <p class="mt-2">正在抓取图片，请稍候...</p>
-            <div class="progress">
-                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
-                     role="progressbar" style="width: 0%"></div>
-            </div>
-            <div id="progressText">已加载: 0/0 张图片</div>
         </div>
 
         <div class="result-container">
