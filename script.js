@@ -8,6 +8,13 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
     const progressText = document.getElementById('progressText');
     const progressNumbers = document.getElementById('progressNumbers');
     const currentPhase = document.getElementById('currentPhase');
+    const submitButton = document.querySelector('button[type="submit"]');
+    const urlInput = document.getElementById('url');
+    
+    // 禁用输入和提交按钮
+    submitButton.disabled = true;
+    urlInput.disabled = true;
+    submitButton.style.opacity = '0.5';
     
     // 清除之前的内容和状态
     loading.style.display = 'block';
@@ -261,6 +268,71 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             downloadBtn.disabled = true;
             downloadBtn.style.opacity = '0.5';
             imageGrid.parentNode.appendChild(downloadBtn);
+
+            // 下载功能
+            downloadBtn.addEventListener('click', async () => {
+                if (selectedImages.size === 0) return;
+                
+                // 禁用下载按钮和选择控制
+                downloadBtn.disabled = true;
+                downloadBtn.style.opacity = '0.5';
+                const selectionControls = document.querySelector('.selection-controls');
+                if (selectionControls) {
+                    const buttons = selectionControls.querySelectorAll('button');
+                    buttons.forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                    });
+                }
+
+                try {
+                    currentPhase.innerHTML = '<i class="fas fa-download"></i> 正在下载图片...';
+                    progressBar.style.width = '0%';
+                    progressText.textContent = '准备下载...';
+                    progressNumbers.textContent = `0/${selectedImages.size}`;
+                    
+                    let downloadedCount = 0;
+                    for (const imageUrl of selectedImages) {
+                        try {
+                            const response = await fetch(imageUrl);
+                            const blob = await response.blob();
+                            const link = document.createElement('a');
+                            link.href = URL.createObjectURL(blob);
+                            link.download = imageUrl.split('/').pop() || 'image.jpg';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(link.href);
+                            
+                            downloadedCount++;
+                            const progress = (downloadedCount / selectedImages.size) * 100;
+                            progressBar.style.width = progress + '%';
+                            progressText.textContent = '正在下载图片';
+                            progressNumbers.textContent = `${downloadedCount}/${selectedImages.size}`;
+                        } catch (error) {
+                            console.error('下载图片失败:', error);
+                        }
+                    }
+                    
+                    currentPhase.innerHTML = '<i class="fas fa-check-circle"></i> 下载完成';
+                    progressText.textContent = '下载完成';
+                    
+                } catch (error) {
+                    currentPhase.innerHTML = '<i class="fas fa-exclamation-circle"></i> 下载出错';
+                    console.error('下载过程出错:', error);
+                } finally {
+                    // 重新启用下载按钮和选择控制
+                    downloadBtn.disabled = false;
+                    downloadBtn.style.opacity = '1';
+                    if (selectionControls) {
+                        const buttons = selectionControls.querySelectorAll('button');
+                        buttons.forEach(btn => {
+                            btn.disabled = false;
+                            btn.style.opacity = '1';
+                        });
+                    }
+                }
+            });
         }
 
     } catch (error) {
@@ -268,5 +340,9 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
         currentPhase.innerHTML = '<i class="fas fa-exclamation-circle"></i> 发生错误';
     } finally {
         loading.style.display = 'none';
+        // 重新启用输入和提交按钮
+        submitButton.disabled = false;
+        urlInput.disabled = false;
+        submitButton.style.opacity = '1';
     }
 }); 
