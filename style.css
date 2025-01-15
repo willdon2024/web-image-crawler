@@ -1,1 +1,50 @@
- 
+.selection-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0;
+    width: 100%;
+    text-align: center;
+}
+
+.btn-primary {
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+.btn-success {
+    display: block !important;
+    margin: 20px auto !important;
+    width: auto !important;
+}
+
+.btn-select-all {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin: 0 5px;
+}
+
+.btn-select-all:hover {
+    background-color: #e9ecef;
+}
+
+.selection-info {
+    color: #6c757d;
+    font-size: 14px;
+    margin: 0 10px;
+}
+
+/* 确保表单按钮居中 */
+#crawlForm {
+    text-align: center;
+}
+
+/* 确保结果容器中的内容居中 */
+.result-container {
+    text-align: center;
+} 
