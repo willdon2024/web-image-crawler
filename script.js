@@ -108,7 +108,20 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             downloadBtn.textContent = `下载全部图片 (${successUrls.length}张)`;
             downloadBtn.onclick = async () => {
                 const zip = new JSZip();
-                const zipFilename = 'images.zip';
+                // 生成当前日期时间字符串
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).replace(/\//g, '');
+                const timeStr = now.toLocaleTimeString('zh-CN', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }).replace(/:/g, '');
+                const zipFilename = `images_${dateStr}_${timeStr}.zip`;
 
                 // 创建下载进度条
                 const downloadProgress = document.createElement('div');
@@ -132,7 +145,8 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
                     try {
                         const response = await fetch(url);
                         const blob = await response.blob();
-                        const filename = `image_${i + 1}.${blob.type.split('/')[1]}`;
+                        // 使用日期时间作为文件夹名
+                        const filename = `${dateStr}_${timeStr}/image_${(i + 1).toString().padStart(3, '0')}.${blob.type.split('/')[1]}`;
                         zip.file(filename, blob);
                         updateDownloadProgress();
                     } catch (error) {
