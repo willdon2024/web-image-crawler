@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
 import requests
@@ -9,9 +9,13 @@ import time
 import zipfile
 import io
 import uuid
+import tempfile
 
 app = Flask(__name__)
 CORS(app)
+
+# 使用临时目录存储下载的文件
+TEMP_DIR = tempfile.gettempdir()
 
 class WebImageCrawler:
     def __init__(self, session_id):
@@ -20,9 +24,9 @@ class WebImageCrawler:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         self.session_id = session_id
-        self.save_dir = os.path.join('downloads', session_id)
+        self.save_dir = os.path.join(TEMP_DIR, session_id)
         self.status = {
-            'state': 'ready',  # ready, running, completed, error
+            'state': 'ready',
             'progress': 0,
             'total_images': 0,
             'downloaded': 0,
@@ -128,11 +132,6 @@ class WebImageCrawler:
 # 存储所有爬虫实例
 crawlers = {}
 
-@app.route('/')
-def index():
-    """渲染主页"""
-    return render_template('index.html')
-
 @app.route('/api/crawl', methods=['POST'])
 def start_crawl():
     """开始爬取图片"""
@@ -194,6 +193,6 @@ def download_images(session_id):
         download_name='images.zip'
     )
 
-if __name__ == '__main__':
-    os.makedirs('downloads', exist_ok=True)
-    app.run(host='0.0.0.0', port=5000) 
+# Vercel 需要的处理函数
+def handler(event, context):
+    return app(event, context) 
