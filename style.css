@@ -1,50 +1,252 @@
-.selection-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 10px;
-    margin: 20px 0;
-    width: 100%;
+/* 基础样式 */
+:root {
+    --primary-color: #4a90e2;
+    --secondary-color: #f8f9fa;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+}
+
+body {
+    background-color: #f5f7fa;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.container {
+    max-width: 900px;
+    margin-top: 30px;
+    margin-bottom: 50px;
+}
+
+/* 标题样式 */
+.title-container {
     text-align: center;
+    margin-bottom: 2rem;
+    color: var(--primary-color);
+}
+
+.title-container h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: #6c757d;
+    font-size: 1.1rem;
+}
+
+/* 卡片样式 */
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* 表单和按钮样式 */
+.form-control {
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e9ecef;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+.form-submit {
+    text-align: center;
+    margin-top: 20px;
 }
 
 .btn-primary {
-    display: block !important;
+    display: inline-block !important;
     margin: 0 auto !important;
+    background-color: var(--primary-color) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0.75rem 2rem !important;
+    font-weight: 600 !important;
+    transition: all 0.3s !important;
 }
 
+.btn-primary:hover {
+    background-color: #357abd !important;
+    transform: translateY(-2px) !important;
+}
+
+/* 图片网格样式 */
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.image-wrapper {
+    position: relative;
+    width: 100%;
+    height: 200px;
+}
+
+.image-checkbox {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 20px;
+    height: 20px;
+    z-index: 2;
+    cursor: pointer;
+}
+
+.image-item {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.image-item:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.image-selected {
+    outline: 3px solid var(--primary-color);
+    outline-offset: -3px;
+}
+
+/* 选择控制样式 */
+.selection-controls {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important;
+    margin: 20px 0 !important;
+    width: 100% !important;
+    text-align: center !important;
+}
+
+.btn-select-all {
+    padding: 8px 15px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    cursor: pointer !important;
+    transition: all 0.3s !important;
+    margin: 0 5px !important;
+}
+
+.btn-select-all:hover {
+    background-color: #357abd !important;
+    transform: translateY(-2px) !important;
+}
+
+.selection-info {
+    color: #6c757d !important;
+    font-size: 14px !important;
+    margin: 0 10px !important;
+}
+
+/* 下载按钮样式 */
 .btn-success {
     display: block !important;
     margin: 20px auto !important;
     width: auto !important;
+    min-width: 200px !important;
+    background-color: var(--success-color) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0.75rem 2rem !important;
+    font-weight: 600 !important;
+    transition: all 0.3s !important;
 }
 
-.btn-select-all {
-    padding: 8px 15px;
-    border: none;
+.btn-success:hover {
+    background-color: #218838 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2) !important;
+}
+
+/* 加载和进度样式 */
+.loading {
+    display: none;
+    text-align: center;
+    margin: 30px 0;
+    padding: 20px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-container {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 20px 0;
+}
+
+.progress-status {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.progress {
+    height: 8px;
     border-radius: 4px;
-    background-color: #f8f9fa;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    margin: 0 5px;
-}
-
-.btn-select-all:hover {
     background-color: #e9ecef;
+    margin: 10px 0;
+    overflow: hidden;
 }
 
-.selection-info {
+.progress-bar {
+    background-color: var(--primary-color);
+    transition: width 0.3s ease;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.progress-phase {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    background-color: var(--primary-color);
+    color: white;
+    font-size: 0.8rem;
+    margin-bottom: 10px;
+}
+
+.progress-numbers {
+    font-weight: 500;
+    color: var(--primary-color);
+}
+
+/* 页脚样式 */
+.footer {
+    text-align: center;
+    margin-top: 50px;
+    padding: 20px;
     color: #6c757d;
-    font-size: 14px;
-    margin: 0 10px;
-}
-
-/* 确保表单按钮居中 */
-#crawlForm {
-    text-align: center;
-}
-
-/* 确保结果容器中的内容居中 */
-.result-container {
-    text-align: center;
+    font-size: 0.9rem;
 } 
