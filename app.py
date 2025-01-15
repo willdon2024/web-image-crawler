@@ -1,23 +1,16 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 import os
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-import threading
-import time
-import zipfile
 import io
-import uuid
-import json
+import zipfile
 
 app = Flask(__name__)
 CORS(app)
 
-# 使用内存存储爬虫状态
-crawlers = {}
-
-@app.route('/')
+@app.route('/', methods=['GET'])
 def home():
     return jsonify({"status": "ok", "message": "API is working"})
 
@@ -59,16 +52,19 @@ def crawl():
                     if img_response.status_code == 200:
                         ext = os.path.splitext(urlparse(img_url).path)[1] or '.jpg'
                         zf.writestr(f'image_{i}{ext}', img_response.content)
-                except Exception as e:
+                except Exception:
                     continue
 
         memory_zip.seek(0)
-        return send_file(
-            memory_zip,
+        
+        response = Response(
+            memory_zip.getvalue(),
             mimetype='application/zip',
-            as_attachment=True,
-            download_name='images.zip'
+            headers={
+                'Content-Disposition': 'attachment; filename=images.zip'
+            }
         )
+        return response
 
     except Exception as e:
         return jsonify({
@@ -76,6 +72,7 @@ def crawl():
             'message': str(e)
         }), 500
 
+# Vercel 处理函数
 def handler(event, context):
-    """Handle serverless function invocation"""
-    return app(event, context) 
+    """Handle Vercel serverless function invocation"""
+    return app.handle_request() 
