@@ -1,3 +1,4 @@
+from flask import Flask
 from urllib.parse import urljoin, urlparse
 import json
 import requests
@@ -75,117 +76,63 @@ def download_images(url):
     except Exception as e:
         return None, str(e)
 
-def create_response(status_code, headers, body, is_base64=False):
-    return {
-        'statusCode': status_code,
-        'headers': headers,
-        'body': body,
-        'isBase64Encoded': is_base64
-    }
+app = Flask(__name__)
 
-def handler(request, context):
-    """Vercel serverless function handler"""
-    try:
-        # 获取请求方法和路径
-        method = request.get('method', 'GET')
-        path = request.get('path', '/')
-        
-        # 通用响应头
-        cors_headers = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'
-        }
-        
-        # 处理 OPTIONS 请求
-        if method == 'OPTIONS':
-            return create_response(200, cors_headers, '')
-        
-        # 处理 GET 请求
-        if method == 'GET':
-            response_body = {
-                'status': 'ok',
-                'message': '图片下载 API 服务正常',
-                'usage': {
-                    'method': 'POST',
-                    'endpoint': '/api/crawl',
-                    'body': {
-                        'url': '要抓取的网页地址'
-                    }
+@app.route('/api/crawl', methods=['GET', 'POST', 'OPTIONS'])
+def crawl():
+    # 通用响应头
+    cors_headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+    }
+    
+    # 处理 OPTIONS 请求
+    if request.method == 'OPTIONS':
+        return '', 200, cors_headers
+    
+    # 处理 GET 请求
+    if request.method == 'GET':
+        response_body = {
+            'status': 'ok',
+            'message': '图片下载 API 服务正常',
+            'usage': {
+                'method': 'POST',
+                'endpoint': '/api/crawl',
+                'body': {
+                    'url': '要抓取的网页地址'
                 }
             }
-            headers = {**cors_headers, 'Content-Type': 'application/json'}
-            return create_response(200, headers, json.dumps(response_body))
+        }
+        return json.dumps(response_body), 200, {**cors_headers, 'Content-Type': 'application/json'}
+    
+    # 处理 POST 请求
+    try:
+        if not request.is_json:
+            return json.dumps({'error': '请求必须是JSON格式'}), 400, {**cors_headers, 'Content-Type': 'application/json'}
         
-        # 处理 POST 请求
-        if method == 'POST':
-            try:
-                # 获取请求体
-                body = request.get('body', '')
-                if not body:
-                    return create_response(
-                        400,
-                        {**cors_headers, 'Content-Type': 'application/json'},
-                        json.dumps({'error': '请求体为空'})
-                    )
-                
-                # 解析 JSON
-                if isinstance(body, str):
-                    data = json.loads(body)
-                else:
-                    data = body
-                
-                # 验证 URL
-                url = data.get('url')
-                if not url:
-                    return create_response(
-                        400,
-                        {**cors_headers, 'Content-Type': 'application/json'},
-                        json.dumps({'error': '请提供有效的URL'})
-                    )
-                
-                # 下载图片
-                zip_data, error = download_images(url)
-                if error:
-                    return create_response(
-                        500,
-                        {**cors_headers, 'Content-Type': 'application/json'},
-                        json.dumps({'error': error})
-                    )
-                
-                # 返回成功响应
-                headers = {
-                    **cors_headers,
-                    'Content-Type': 'application/zip',
-                    'Content-Transfer-Encoding': 'base64',
-                    'Content-Disposition': 'attachment; filename=images.zip'
-                }
-                return create_response(200, headers, zip_data, True)
-                
-            except json.JSONDecodeError:
-                return create_response(
-                    400,
-                    {**cors_headers, 'Content-Type': 'application/json'},
-                    json.dumps({'error': '无效的JSON格式'})
-                )
-            except Exception as e:
-                logger.error(f"处理请求时出错: {str(e)}")
-                return create_response(
-                    500,
-                    {**cors_headers, 'Content-Type': 'application/json'},
-                    json.dumps({'error': f'服务器错误: {str(e)}'})
-                )
+        data = request.get_json()
+        url = data.get('url')
         
-        # 不支持的请求方法
-        return create_response(
-            405,
-            {**cors_headers, 'Content-Type': 'application/json', 'Allow': 'GET, POST, OPTIONS'},
-            json.dumps({'error': f'不支持的请求方法: {method}'})
-        )
+        if not url:
+            return json.dumps({'error': '请提供有效的URL'}), 400, {**cors_headers, 'Content-Type': 'application/json'}
+        
+        zip_data, error = download_images(url)
+        if error:
+            return json.dumps({'error': error}), 500, {**cors_headers, 'Content-Type': 'application/json'}
+        
+        headers = {
+            **cors_headers,
+            'Content-Type': 'application/zip',
+            'Content-Transfer-Encoding': 'base64',
+            'Content-Disposition': 'attachment; filename=images.zip'
+        }
+        return zip_data, 200, headers
         
     except Exception as e:
         logger.error(f"处理请求时出错: {str(e)}")
-        return create_response(
-            500,
-            {**cors_headers, 'Content-Type': 'application/json'},
-            json.dumps({'error': f'服务器错误: {str(e)}'})
+        return json.dumps({'error': f'服务器错误: {str(e)}'}), 500, {**cors_headers, 'Content-Type': 'application/json'}
+
+def handler(event, context):
+    """Vercel serverless function handler"""
+    return app
