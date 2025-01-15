@@ -75,4 +75,6 @@ def crawl():
 # Vercel 处理函数
 def handler(event, context):
     """Handle Vercel serverless function invocation"""
+    if event.get('path', '').startswith('/api/'):
+        return app(event, context)
     return app.handle_request() 
