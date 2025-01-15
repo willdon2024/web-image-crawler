@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>图片爬虫测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-form {
+            margin-bottom: 20px;
+        }
+        .result {
+            white-space: pre-wrap;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        #urlInput {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .preset-urls {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 4px;
+        }
+        .preset-urls button {
+            margin: 5px;
+            background: #2196F3;
+        }
+        .preset-urls button:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <h1>图片爬虫测试</h1>
+    <div class="test-form">
+        <input type="text" id="urlInput" placeholder="输入要爬取的网页URL">
+        <button onclick="fetchImages()">开始爬取</button>
+    </div>
+    
+    <div class="preset-urls">
+        <h3>测试网址：</h3>
+        <button onclick="setUrl('https://pixabay.com')">Pixabay图片网站</button>
+        <button onclick="setUrl('https://www.pexels.com')">Pexels图片网站</button>
+        <button onclick="setUrl('https://www.nasa.gov/multimedia/imagegallery')">NASA图片库</button>
+        <button onclick="setUrl('https://500px.com/popular')">500px热门图片</button>
+        <button onclick="setUrl('https://www.nationalgeographic.com/photography')">国家地理摄影</button>
+        <h3>新闻网站测试：</h3>
+        <button onclick="setUrl('https://www.bbc.com')">BBC新闻</button>
+        <button onclick="setUrl('https://www.theverge.com')">The Verge</button>
+        <button onclick="setUrl('https://www.engadget.com')">Engadget</button>
+    </div>
+
+    <div id="result" class="result"></div>
+
+    <script>
+        function setUrl(url) {
+            document.getElementById('urlInput').value = url;
+        }
+
+        async function fetchImages() {
+            const url = document.getElementById('urlInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!url) {
+                resultDiv.textContent = '请输入URL';
+                return;
+            }
+            
+            resultDiv.textContent = '正在获取图片...';
+            
+            try {
+                const response = await fetch('http://localhost:3000/fetch-with-js', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    let output = `找到 ${data.stats.totalImages} 张图片\n`;
+                    output += `处理时间: ${data.stats.processingTimeMs}ms\n\n`;
+                    
+                    // 显示图片类型统计
+                    output += '图片类型统计:\n';
+                    for (const [type, count] of Object.entries(data.stats.byType)) {
+                        output += `${type}: ${count}张\n`;
+                    }
+                    
+                    // 显示域名统计
+                    output += '\n域名统计:\n';
+                    for (const [domain, count] of Object.entries(data.stats.byDomain)) {
+                        output += `${domain}: ${count}张\n`;
+                    }
+                    
+                    // 显示所有图片URL
+                    output += '\n图片URL列表:\n';
+                    data.imageUrls.forEach((url, index) => {
+                        output += `${index + 1}. ${url}\n`;
+                    });
+                    
+                    resultDiv.textContent = output;
+                } else {
+                    resultDiv.textContent = `错误: ${data.error}\n详细信息: ${JSON.stringify(data.details, null, 2)}`;
+                }
+            } catch (error) {
+                resultDiv.textContent = `请求失败: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html> 
