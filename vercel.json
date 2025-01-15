@@ -8,6 +8,10 @@
                 "maxLambdaSize": "15mb",
                 "runtime": "python3.9"
             }
+        },
+        {
+            "src": "docs/**",
+            "use": "@vercel/static"
         }
     ],
     "routes": [
@@ -16,9 +20,12 @@
             "dest": "app.py"
         },
         {
+            "src": "/",
+            "dest": "docs/index.html"
+        },
+        {
             "src": "/(.*)",
-            "dest": "docs/$1",
-            "continue": true
+            "dest": "docs/$1"
         }
     ],
     "env": {
