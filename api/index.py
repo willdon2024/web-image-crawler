@@ -7,29 +7,81 @@ import base64
 import io
 import zipfile
 import os
+import random
+import logging
+import time
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# 随机User-Agent列表
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59'
+]
+
+def get_random_headers():
+    """生成随机请求头"""
+    return {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0',
+        'TE': 'Trailers'
+    }
 
 def download_images(url):
     try:
-        # 设置请求头
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        logger.info(f"开始处理URL: {url}")
         
         # 获取网页内容
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
+        headers = get_random_headers()
+        logger.info(f"使用请求头: {headers}")
+        
+        session = requests.Session()
+        session.headers.update(headers)
+        
+        # 首先尝试获取网页
+        try:
+            response = session.get(url, timeout=10, allow_redirects=True)
+            response.raise_for_status()
+            logger.info(f"成功获取网页，状态码: {response.status_code}")
+        except requests.RequestException as e:
+            logger.error(f"获取网页失败: {str(e)}")
+            return None, f"获取网页失败: {str(e)}"
         
         # 解析图片URL
         soup = BeautifulSoup(response.text, 'html.parser')
-        img_urls = []
-        for img in soup.find_all('img'):
-            img_url = img.get('src') or img.get('data-src')
-            if img_url:
-                img_url = urljoin(url, img_url)
-                if urlparse(img_url).scheme in ['http', 'https']:
-                    img_urls.append(img_url)
+        img_urls = set()  # 使用集合去重
+        
+        # 查找所有可能包含图片的标签和属性
+        img_patterns = [
+            ('img', 'src'),
+            ('img', 'data-src'),
+            ('img', 'data-original'),
+            ('div', 'data-background'),
+            ('a', 'href')
+        ]
+        
+        for tag, attr in img_patterns:
+            for element in soup.find_all(tag):
+                img_url = element.get(attr)
+                if img_url and any(ext in img_url.lower() for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+                    img_url = urljoin(url, img_url)
+                    if urlparse(img_url).scheme in ['http', 'https']:
+                        img_urls.add(img_url)
+        
+        logger.info(f"找到 {len(img_urls)} 个图片URL")
         
         if not img_urls:
+            logger.warning("未找到任何图片URL")
             return None, "未找到任何图片"
             
         # 下载图片并创建ZIP
@@ -37,23 +89,45 @@ def download_images(url):
         downloaded_count = 0
         
         with zipfile.ZipFile(memory_zip, 'w') as zf:
-            for i, img_url in enumerate(img_urls[:5]):  # 限制最多下载5张图片
+            for i, img_url in enumerate(list(img_urls)[:10]):  # 限制最多下载10张图片
                 try:
-                    img_response = requests.get(img_url, headers=headers, timeout=5)
+                    logger.info(f"正在下载图片 {i+1}/10: {img_url}")
+                    # 添加随机延迟
+                    time.sleep(random.uniform(0.5, 1.5))
+                    
+                    img_response = session.get(img_url, timeout=5)
                     img_response.raise_for_status()
-                    ext = os.path.splitext(urlparse(img_url).path)[1] or '.jpg'
-                    zf.writestr(f'image_{i}{ext}', img_response.content)
+                    
+                    # 验证内容类型
+                    content_type = img_response.headers.get('content-type', '')
+                    if not content_type.startswith('image/'):
+                        logger.warning(f"跳过非图片内容: {content_type}")
+                        continue
+                    
+                    # 获取文件扩展名
+                    ext = os.path.splitext(urlparse(img_url).path)[1]
+                    if not ext:
+                        ext = '.jpg'  # 默认扩展名
+                    
+                    # 保存图片
+                    zf.writestr(f'image_{i+1}{ext}', img_response.content)
                     downloaded_count += 1
-                except Exception:
+                    logger.info(f"成功下载图片 {i+1}")
+                    
+                except Exception as e:
+                    logger.error(f"下载图片失败 {img_url}: {str(e)}")
                     continue
                     
         if downloaded_count == 0:
+            logger.error("所有图片下载失败")
             return None, "所有图片下载失败"
             
+        logger.info(f"成功下载 {downloaded_count} 张图片")
         memory_zip.seek(0)
         return base64.b64encode(memory_zip.getvalue()).decode('utf-8'), None
         
     except Exception as e:
+        logger.error(f"处理过程中出错: {str(e)}")
         return None, str(e)
 
 def handle_request(event):
@@ -155,6 +229,7 @@ def handle_request(event):
                 'body': json.dumps({'error': '无效的JSON格式'})
             }
         except Exception as e:
+            logger.error(f"处理请求时出错: {str(e)}")
             return {
                 'statusCode': 500,
                 'headers': {
