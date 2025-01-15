@@ -10,12 +10,19 @@ import zipfile
 import io
 import uuid
 import tempfile
+import sys
+import traceback
 
 app = Flask(__name__)
 CORS(app)
 
 # 使用临时目录存储下载的文件
-TEMP_DIR = tempfile.gettempdir()
+TEMP_DIR = '/tmp'
+
+@app.route('/api/test', methods=['GET'])
+def test():
+    """测试路由"""
+    return jsonify({'status': 'ok', 'message': 'API is working'})
 
 class WebImageCrawler:
     def __init__(self, session_id):
@@ -32,53 +39,65 @@ class WebImageCrawler:
             'downloaded': 0,
             'message': '准备就绪'
         }
-        os.makedirs(self.save_dir, exist_ok=True)
+        try:
+            os.makedirs(self.save_dir, exist_ok=True)
+        except Exception as e:
+            print(f"Error creating directory: {str(e)}", file=sys.stderr)
+            self.status['state'] = 'error'
+            self.status['message'] = f'创建目录失败: {str(e)}'
 
     def _is_valid_url(self, url):
         """检查URL是否有效"""
         try:
             result = urlparse(url)
             return all([result.scheme, result.netloc])
-        except:
+        except Exception as e:
+            print(f"Error validating URL: {str(e)}", file=sys.stderr)
             return False
 
     def _get_file_extension(self, url):
         """获取图片文件扩展名"""
-        parsed = urlparse(url)
-        ext = os.path.splitext(parsed.path)[1]
-        return ext.lower() if ext else '.jpg'
+        try:
+            parsed = urlparse(url)
+            ext = os.path.splitext(parsed.path)[1]
+            return ext.lower() if ext else '.jpg'
+        except Exception as e:
+            print(f"Error getting file extension: {str(e)}", file=sys.stderr)
+            return '.jpg'
 
     def _download_image(self, img_url, filename):
         """下载单个图片"""
         try:
-            response = requests.get(img_url, headers=self.headers, stream=True)
+            response = requests.get(img_url, headers=self.headers, stream=True, timeout=10)
             if response.status_code == 200:
                 with open(filename, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=1024):
                         if chunk:
                             f.write(chunk)
                 return True
+            print(f"Failed to download image: {img_url}, status code: {response.status_code}", file=sys.stderr)
             return False
-        except Exception:
+        except Exception as e:
+            print(f"Error downloading image: {str(e)}", file=sys.stderr)
             return False
 
     def crawl(self, url):
         """爬取指定网页上的所有图片"""
-        if not self._is_valid_url(url):
-            self.status = {
-                'state': 'error',
-                'message': '无效的URL!'
-            }
-            return
-
         try:
+            if not self._is_valid_url(url):
+                self.status = {
+                    'state': 'error',
+                    'message': '无效的URL!'
+                }
+                return
+
             self.status = {
                 'state': 'running',
                 'progress': 0,
                 'message': '正在分析网页...'
             }
 
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(url, headers=self.headers, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
             
             img_tags = soup.find_all('img')
@@ -124,6 +143,7 @@ class WebImageCrawler:
             })
 
         except Exception as e:
+            print(f"Error in crawl: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
             self.status = {
                 'state': 'error',
                 'message': f'发生错误: {str(e)}'
@@ -135,63 +155,79 @@ crawlers = {}
 @app.route('/api/crawl', methods=['POST'])
 def start_crawl():
     """开始爬取图片"""
-    url = request.json.get('url')
-    if not url:
-        return jsonify({'error': '请提供URL'}), 400
+    try:
+        url = request.json.get('url')
+        if not url:
+            return jsonify({'error': '请提供URL'}), 400
 
-    # 创建新的会话ID
-    session_id = str(uuid.uuid4())
-    crawler = WebImageCrawler(session_id)
-    crawlers[session_id] = crawler
+        # 创建新的会话ID
+        session_id = str(uuid.uuid4())
+        crawler = WebImageCrawler(session_id)
+        crawlers[session_id] = crawler
 
-    # 在新线程中运行爬虫
-    thread = threading.Thread(target=crawler.crawl, args=(url,))
-    thread.daemon = True
-    thread.start()
+        # 在新线程中运行爬虫
+        thread = threading.Thread(target=crawler.crawl, args=(url,))
+        thread.daemon = True
+        thread.start()
 
-    return jsonify({
-        'session_id': session_id,
-        'message': '开始下载'
-    })
+        return jsonify({
+            'session_id': session_id,
+            'message': '开始下载'
+        })
+    except Exception as e:
+        print(f"Error in start_crawl: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/status/<session_id>')
 def get_status(session_id):
     """获取下载状态"""
-    crawler = crawlers.get(session_id)
-    if not crawler:
-        return jsonify({'error': '会话不存在'}), 404
-    return jsonify(crawler.status)
+    try:
+        crawler = crawlers.get(session_id)
+        if not crawler:
+            return jsonify({'error': '会话不存在'}), 404
+        return jsonify(crawler.status)
+    except Exception as e:
+        print(f"Error in get_status: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/download/<session_id>')
 def download_images(session_id):
     """下载打包的图片"""
-    crawler = crawlers.get(session_id)
-    if not crawler or crawler.status['state'] != 'completed':
-        return jsonify({'error': '图片未准备好'}), 400
+    try:
+        crawler = crawlers.get(session_id)
+        if not crawler or crawler.status['state'] != 'completed':
+            return jsonify({'error': '图片未准备好'}), 400
 
-    # 创建内存中的ZIP文件
-    memory_file = io.BytesIO()
-    with zipfile.ZipFile(memory_file, 'w') as zf:
-        for root, dirs, files in os.walk(crawler.save_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, crawler.save_dir)
-                zf.write(file_path, arcname)
+        # 创建内存中的ZIP文件
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w') as zf:
+            for root, dirs, files in os.walk(crawler.save_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, crawler.save_dir)
+                    zf.write(file_path, arcname)
 
-    # 清理文件
-    for root, dirs, files in os.walk(crawler.save_dir):
-        for file in files:
-            os.remove(os.path.join(root, file))
-    os.rmdir(crawler.save_dir)
-    del crawlers[session_id]
+        # 清理文件
+        try:
+            for root, dirs, files in os.walk(crawler.save_dir):
+                for file in files:
+                    os.remove(os.path.join(root, file))
+            os.rmdir(crawler.save_dir)
+        except Exception as e:
+            print(f"Error cleaning up files: {str(e)}", file=sys.stderr)
 
-    memory_file.seek(0)
-    return send_file(
-        memory_file,
-        mimetype='application/zip',
-        as_attachment=True,
-        download_name='images.zip'
-    )
+        del crawlers[session_id]
+
+        memory_file.seek(0)
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='images.zip'
+        )
+    except Exception as e:
+        print(f"Error in download_images: {str(e)}\n{traceback.format_exc()}", file=sys.stderr)
+        return jsonify({'error': str(e)}), 500
 
 # Vercel 需要的处理函数
 def handler(event, context):
