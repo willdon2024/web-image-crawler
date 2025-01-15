@@ -17,6 +17,15 @@
     "routes": [
         {
             "src": "/api/(.*)",
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type"
+            },
+            "continue": true
+        },
+        {
+            "src": "/api/(.*)",
             "dest": "app.py"
         },
         {
