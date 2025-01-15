@@ -6,6 +6,7 @@ from urllib.parse import urljoin, urlparse
 import base64
 import io
 import zipfile
+import os
 
 def download_images(url):
     try:
@@ -55,51 +56,83 @@ def download_images(url):
     except Exception as e:
         return None, str(e)
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Access-Control-Max-Age', '86400')
-        self.end_headers()
-        
-    def do_POST(self):
-        try:
-            # 读取请求体
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
+def handle_request(request):
+    if request.get('method') == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Max-Age': '86400'
+            },
+            'body': ''
+        }
+    
+    try:
+        # 获取请求体
+        body = request.get('body', '')
+        if isinstance(body, str):
+            data = json.loads(body)
+        else:
+            data = body
             
-            # 验证URL
-            url = data.get('url')
-            if not url:
-                self._send_json_response(400, {'error': '请提供有效的URL'})
-                return
-                
-            # 下载图片
-            zip_data, error = download_images(url)
-            if error:
-                self._send_json_response(500, {'error': error})
-                return
-                
-            # 发送成功响应
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/zip')
-            self.send_header('Content-Transfer-Encoding', 'base64')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Content-Disposition', 'attachment; filename=images.zip')
-            self.end_headers()
-            self.wfile.write(zip_data.encode('utf-8'))
+        # 验证URL
+        url = data.get('url')
+        if not url:
+            return {
+                'statusCode': 400,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': '请提供有效的URL'})
+            }
             
-        except json.JSONDecodeError:
-            self._send_json_response(400, {'error': '无效的JSON格式'})
-        except Exception as e:
-            self._send_json_response(500, {'error': f'服务器错误: {str(e)}'})
+        # 下载图片
+        zip_data, error = download_images(url)
+        if error:
+            return {
+                'statusCode': 500,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                },
+                'body': json.dumps({'error': error})
+            }
             
-    def _send_json_response(self, status_code, data):
-        self.send_response(status_code)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8')) 
+        # 返回成功响应
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/zip',
+                'Content-Transfer-Encoding': 'base64',
+                'Access-Control-Allow-Origin': '*',
+                'Content-Disposition': 'attachment; filename=images.zip'
+            },
+            'body': zip_data,
+            'isBase64Encoded': True
+        }
+            
+    except json.JSONDecodeError:
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': '无效的JSON格式'})
+        }
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({'error': f'服务器错误: {str(e)}'})
+        }
+
+def handler(event, context):
+    """Vercel serverless function handler"""
+    return handle_request(event) 
