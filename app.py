@@ -79,4 +79,34 @@ def crawl():
 
 def handler(event, context):
     """Handle Vercel serverless function invocation"""
-    return create_app() 
+    flask_app = create_app()
+    
+    # 从事件中获取请求信息
+    path = event.get('path', '/')
+    http_method = event.get('httpMethod', 'GET')
+    headers = event.get('headers', {})
+    body = event.get('body', '')
+    
+    # 创建 WSGI 环境
+    environ = {
+        'REQUEST_METHOD': http_method,
+        'PATH_INFO': path,
+        'QUERY_STRING': event.get('queryStringParameters', ''),
+        'CONTENT_LENGTH': str(len(body) if body else ''),
+        'CONTENT_TYPE': headers.get('content-type', ''),
+        'wsgi.url_scheme': 'https',
+        'wsgi.input': io.StringIO(body if body else ''),
+        'wsgi.errors': io.StringIO(),
+        'wsgi.multithread': False,
+        'wsgi.multiprocess': False,
+        'wsgi.run_once': False,
+    }
+    
+    # 处理请求
+    response = flask_app.wsgi_app(environ, lambda s, h: None)
+    
+    return {
+        'statusCode': response.status_code,
+        'headers': dict(response.headers),
+        'body': response.get_data(as_text=True)
+    } 
