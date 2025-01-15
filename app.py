@@ -161,141 +161,182 @@ def handler(event, context):
     logger.info("Received serverless function invocation")
     logger.info(f"Event: {event}")
     
-    if not event:
-        logger.error("No event data")
-        return {
-            'statusCode': 400,
-            'body': json.dumps({'error': 'Invalid request'})
-        }
-
-    # 从事件中获取请求信息
-    path = event.get('path', '/')
-    http_method = event.get('httpMethod', 'GET')
-    headers = event.get('headers', {})
-    body = event.get('body', '')
-
-    logger.info(f"Method: {http_method}, Path: {path}")
-
-    # 处理 OPTIONS 请求
-    if http_method == 'OPTIONS':
-        logger.info("Handling OPTIONS request")
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Max-Age': '86400'
-            },
-            'body': ''
-        }
-
-    # 如果是 POST 请求，确保 body 是 JSON 格式
-    if http_method == 'POST' and body:
-        try:
-            if isinstance(body, str):
-                body = json.loads(body)
-                logger.info("Successfully parsed JSON body")
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON: {str(e)}")
+    try:
+        if not event:
+            logger.error("No event data")
             return {
                 'statusCode': 400,
-                'headers': {'Content-Type': 'application/json'},
-                'body': json.dumps({'error': 'Invalid JSON'})
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type'
+                },
+                'body': json.dumps({'error': 'Invalid request'})
             }
 
-    # 创建请求环境
-    logger.info("Creating WSGI environment")
-    environ = {
-        'REQUEST_METHOD': http_method,
-        'PATH_INFO': path,
-        'QUERY_STRING': '',
-        'CONTENT_LENGTH': str(len(json.dumps(body)) if body else ''),
-        'CONTENT_TYPE': 'application/json',
-        'wsgi.url_scheme': 'https',
-        'wsgi.input': io.StringIO(json.dumps(body) if body else ''),
-        'wsgi.errors': io.StringIO(),
-        'wsgi.multithread': False,
-        'wsgi.multiprocess': False,
-        'wsgi.run_once': False,
-        'SERVER_NAME': 'vercel',
-        'SERVER_PORT': '443',
-        'SERVER_PROTOCOL': 'HTTP/1.1',
-        'HTTP_ORIGIN': headers.get('origin', '*')
-    }
+        # 从事件中获取请求信息
+        path = event.get('path', '/')
+        http_method = event.get('httpMethod', 'GET')
+        headers = event.get('headers', {})
+        body = event.get('body', '')
 
-    # 添加请求头
-    for key, value in headers.items():
-        key = key.upper().replace('-', '_')
-        if key not in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
-            environ[f'HTTP_{key}'] = value
+        logger.info(f"Method: {http_method}, Path: {path}")
 
-    # 处理请求
-    logger.info("Processing request")
-    response_data = []
-    def start_response(status, response_headers, exc_info=None):
-        response_data.append({
-            'status': status,
-            'headers': response_headers
-        })
+        # 处理 OPTIONS 请求
+        if http_method == 'OPTIONS':
+            logger.info("Handling OPTIONS request")
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Max-Age': '86400'
+                },
+                'body': json.dumps({'status': 'ok'})
+            }
 
-    try:
-        logger.info("Calling WSGI application")
-        response_body = b''.join(app.wsgi_app(environ, start_response))
-        response = response_data[0]
-        
-        # 处理响应
-        status_code = int(response['status'].split()[0])
-        headers = dict(response['headers'])
-        
-        # 添加 CORS 头
-        headers.update({
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'
-        })
-        
-        # 如果是文件下载响应
-        if headers.get('Content-Type') == 'application/zip':
+        # 如果是 POST 请求，确保 body 是 JSON 格式
+        if http_method == 'POST' and body:
             try:
-                logger.info("Encoding ZIP file as base64")
-                import base64
-                body = base64.b64encode(response_body).decode('utf-8')
-                headers['Content-Transfer-Encoding'] = 'base64'
-                is_base64 = True
-                logger.info("Successfully encoded ZIP file")
-            except Exception as e:
-                logger.error(f"Error encoding file: {str(e)}")
+                if isinstance(body, str):
+                    body = json.loads(body)
+                    logger.info("Successfully parsed JSON body")
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON: {str(e)}")
                 return {
-                    'statusCode': 500,
-                    'headers': {'Content-Type': 'application/json'},
-                    'body': json.dumps({'error': f'Error encoding file: {str(e)}'})
-                }
-        else:
-            try:
-                logger.info("Decoding response body")
-                body = response_body.decode('utf-8')
-                is_base64 = False
-            except Exception as e:
-                logger.error(f"Error decoding response: {str(e)}")
-                return {
-                    'statusCode': 500,
-                    'headers': {'Content-Type': 'application/json'},
-                    'body': json.dumps({'error': f'Error decoding response: {str(e)}'})
+                    'statusCode': 400,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                        'Access-Control-Allow-Headers': 'Content-Type'
+                    },
+                    'body': json.dumps({'error': 'Invalid JSON'})
                 }
 
-        logger.info(f"Returning response with status code {status_code}")
-        return {
-            'statusCode': status_code,
-            'headers': headers,
-            'body': body,
-            'isBase64Encoded': is_base64
+        # 创建请求环境
+        logger.info("Creating WSGI environment")
+        environ = {
+            'REQUEST_METHOD': http_method,
+            'PATH_INFO': path,
+            'QUERY_STRING': '',
+            'CONTENT_LENGTH': str(len(json.dumps(body)) if body else ''),
+            'CONTENT_TYPE': 'application/json',
+            'wsgi.url_scheme': 'https',
+            'wsgi.input': io.StringIO(json.dumps(body) if body else ''),
+            'wsgi.errors': io.StringIO(),
+            'wsgi.multithread': False,
+            'wsgi.multiprocess': False,
+            'wsgi.run_once': False,
+            'SERVER_NAME': 'vercel',
+            'SERVER_PORT': '443',
+            'SERVER_PROTOCOL': 'HTTP/1.1',
+            'HTTP_ORIGIN': headers.get('origin', '*')
         }
+
+        # 添加请求头
+        for key, value in headers.items():
+            key = key.upper().replace('-', '_')
+            if key not in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
+                environ[f'HTTP_{key}'] = value
+
+        # 处理请求
+        logger.info("Processing request")
+        response_data = []
+        def start_response(status, response_headers, exc_info=None):
+            response_data.append({
+                'status': status,
+                'headers': response_headers
+            })
+
+        try:
+            logger.info("Calling WSGI application")
+            response_body = b''.join(app.wsgi_app(environ, start_response))
+            response = response_data[0]
+            
+            # 处理响应
+            status_code = int(response['status'].split()[0])
+            headers = dict(response['headers'])
+            
+            # 添加 CORS 头
+            headers.update({
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            })
+            
+            # 如果是文件下载响应
+            if headers.get('Content-Type') == 'application/zip':
+                try:
+                    logger.info("Encoding ZIP file as base64")
+                    import base64
+                    body = base64.b64encode(response_body).decode('utf-8')
+                    headers['Content-Transfer-Encoding'] = 'base64'
+                    is_base64 = True
+                    logger.info("Successfully encoded ZIP file")
+                except Exception as e:
+                    logger.error(f"Error encoding file: {str(e)}")
+                    return {
+                        'statusCode': 500,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*',
+                            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                            'Access-Control-Allow-Headers': 'Content-Type'
+                        },
+                        'body': json.dumps({'error': f'Error encoding file: {str(e)}'})
+                    }
+            else:
+                try:
+                    logger.info("Decoding response body")
+                    body = response_body.decode('utf-8')
+                    is_base64 = False
+                except Exception as e:
+                    logger.error(f"Error decoding response: {str(e)}")
+                    return {
+                        'statusCode': 500,
+                        'headers': {
+                            'Content-Type': 'application/json',
+                            'Access-Control-Allow-Origin': '*',
+                            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                            'Access-Control-Allow-Headers': 'Content-Type'
+                        },
+                        'body': json.dumps({'error': f'Error decoding response: {str(e)}'})
+                    }
+
+            logger.info(f"Returning response with status code {status_code}")
+            return {
+                'statusCode': status_code,
+                'headers': headers,
+                'body': body,
+                'isBase64Encoded': is_base64
+            }
+        except Exception as e:
+            logger.error(f"Error in WSGI app: {str(e)}")
+            logger.error(traceback.format_exc())
+            return {
+                'statusCode': 500,
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type'
+                },
+                'body': json.dumps({'error': f'Server error: {str(e)}'})
+            }
     except Exception as e:
         logger.error(f"Error in handler: {str(e)}")
         logger.error(traceback.format_exc())
         return {
             'statusCode': 500,
-            'headers': {'Content-Type': 'application/json'},
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            },
             'body': json.dumps({'error': f'Server error: {str(e)}'})
         } 
