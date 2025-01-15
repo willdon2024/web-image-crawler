@@ -73,6 +73,57 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             return;
         }
 
+        // 添加选择控制按钮
+        const selectionControls = document.createElement('div');
+        selectionControls.className = 'selection-controls';
+        selectionControls.innerHTML = `
+            <button type="button" class="btn-select-all" data-action="select-all">
+                <i class="fas fa-check-square"></i> 全选
+            </button>
+            <button type="button" class="btn-select-all" data-action="deselect-all">
+                <i class="fas fa-square"></i> 取消全选
+            </button>
+            <span class="selection-info">已选择: 0/${imageUrls.length} 张图片</span>
+        `;
+        imageGrid.parentNode.insertBefore(selectionControls, imageGrid);
+
+        // 选择状态管理
+        const selectedImages = new Set();
+        const updateSelectionInfo = () => {
+            const info = selectionControls.querySelector('.selection-info');
+            info.textContent = `已选择: ${selectedImages.size}/${imageUrls.length} 张图片`;
+            
+            // 更新下载按钮状态
+            const downloadBtn = document.querySelector('.btn-success');
+            if (downloadBtn) {
+                downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载已选图片 (${selectedImages.size}张)`;
+                downloadBtn.disabled = selectedImages.size === 0;
+                downloadBtn.style.opacity = selectedImages.size === 0 ? '0.5' : '1';
+            }
+        };
+
+        // 全选/取消全选功能
+        selectionControls.addEventListener('click', (e) => {
+            const button = e.target.closest('button');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const checkboxes = imageGrid.querySelectorAll('.image-checkbox');
+            const images = imageGrid.querySelectorAll('.image-item');
+
+            checkboxes.forEach((checkbox, index) => {
+                checkbox.checked = action === 'select-all';
+                images[index].classList.toggle('image-selected', action === 'select-all');
+                if (action === 'select-all') {
+                    selectedImages.add(imageUrls[index]);
+                } else {
+                    selectedImages.delete(imageUrls[index]);
+                }
+            });
+
+            updateSelectionInfo();
+        });
+
         currentPhase.innerHTML = '<i class="fas fa-images"></i> 正在加载图片...';
         progressText.textContent = '正在加载图片';
         progressNumbers.textContent = `0/${imageUrls.length}`;
@@ -88,21 +139,46 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             progressNumbers.textContent = `${loadedCount}/${imageUrls.length}`;
         };
 
-        const loadPromises = imageUrls.map(imageUrl => {
+        const loadPromises = imageUrls.map((imageUrl, index) => {
             return new Promise((resolve, reject) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'image-wrapper';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'image-checkbox';
+                checkbox.addEventListener('change', () => {
+                    const img = wrapper.querySelector('.image-item');
+                    if (checkbox.checked) {
+                        selectedImages.add(imageUrl);
+                        img.classList.add('image-selected');
+                    } else {
+                        selectedImages.delete(imageUrl);
+                        img.classList.remove('image-selected');
+                    }
+                    updateSelectionInfo();
+                });
+
                 const img = document.createElement('img');
                 img.src = imageUrl;
                 img.className = 'image-item';
                 img.addEventListener('load', () => {
-                    imageGrid.appendChild(img);
-                    img.addEventListener('click', () => window.open(imageUrl, '_blank'));
+                    wrapper.appendChild(checkbox);
+                    wrapper.appendChild(img);
+                    imageGrid.appendChild(wrapper);
+                    img.addEventListener('click', (e) => {
+                        if (e.target === img) {
+                            checkbox.checked = !checkbox.checked;
+                            checkbox.dispatchEvent(new Event('change'));
+                        }
+                    });
                     successCount++;
                     updateProgress();
                     resolve(imageUrl);
                 });
                 img.addEventListener('error', () => {
                     updateProgress();
-                    resolve(null); // 加载失败返回null
+                    resolve(null);
                 });
             });
         });
@@ -114,8 +190,12 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
         if (successUrls.length > 0) {
             const downloadBtn = document.createElement('button');
             downloadBtn.className = 'btn btn-success';
-            downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载全部图片 (${successUrls.length}张)`;
+            downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载已选图片 (0张)`;
+            downloadBtn.disabled = true;
+            downloadBtn.style.opacity = '0.5';
             downloadBtn.onclick = async () => {
+                if (selectedImages.size === 0) return;
+
                 const zip = new JSZip();
                 // 生成当前日期时间字符串
                 const now = new Date();
@@ -145,28 +225,28 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
                     </div>
                     <div class="progress-info">
                         <span>正在下载图片</span>
-                        <span class="progress-numbers">0/${successUrls.length}</span>
+                        <span class="progress-numbers">0/${selectedImages.size}</span>
                     </div>
                 `;
                 downloadBtn.parentNode.insertBefore(downloadProgressContainer, downloadBtn.nextSibling);
 
-                // 下载所有图片并添加到zip
+                // 下载所有选中的图片并添加到zip
                 let downloadCount = 0;
+                const selectedUrlsArray = Array.from(selectedImages);
                 const updateDownloadProgress = () => {
                     downloadCount++;
-                    const progress = (downloadCount / successUrls.length) * 100;
+                    const progress = (downloadCount / selectedImages.size) * 100;
                     const progressBar = downloadProgressContainer.querySelector('.progress-bar');
                     const progressNumbers = downloadProgressContainer.querySelector('.progress-numbers');
                     progressBar.style.width = `${progress}%`;
-                    progressNumbers.textContent = `${downloadCount}/${successUrls.length}`;
+                    progressNumbers.textContent = `${downloadCount}/${selectedImages.size}`;
                 };
 
-                for (let i = 0; i < successUrls.length; i++) {
-                    const url = successUrls[i];
+                for (let i = 0; i < selectedUrlsArray.length; i++) {
+                    const url = selectedUrlsArray[i];
                     try {
                         const response = await fetch(url);
                         const blob = await response.blob();
-                        // 使用日期时间作为文件夹名
                         const filename = `${dateStr}_${timeStr}/image_${(i + 1).toString().padStart(3, '0')}.${blob.type.split('/')[1]}`;
                         zip.file(filename, blob);
                         updateDownloadProgress();
