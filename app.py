@@ -6,9 +6,13 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import io
 import zipfile
+import json
 
 app = Flask(__name__)
 CORS(app)
+
+def create_app():
+    return app
 
 @app.route('/', methods=['GET'])
 def home():
@@ -17,10 +21,11 @@ def home():
 @app.route('/api/crawl', methods=['POST'])
 def crawl():
     try:
-        url = request.json.get('url')
-        if not url:
+        data = request.get_json()
+        if not data or 'url' not in data:
             return jsonify({'error': '请提供URL'}), 400
 
+        url = data['url']
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
@@ -52,29 +57,26 @@ def crawl():
                     if img_response.status_code == 200:
                         ext = os.path.splitext(urlparse(img_url).path)[1] or '.jpg'
                         zf.writestr(f'image_{i}{ext}', img_response.content)
-                except Exception:
+                except Exception as e:
+                    print(f"Error downloading image {img_url}: {str(e)}")
                     continue
 
         memory_zip.seek(0)
         
-        response = Response(
-            memory_zip.getvalue(),
+        return send_file(
+            memory_zip,
             mimetype='application/zip',
-            headers={
-                'Content-Disposition': 'attachment; filename=images.zip'
-            }
+            as_attachment=True,
+            download_name='images.zip'
         )
-        return response
 
     except Exception as e:
+        print(f"Error in crawl: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
         }), 500
 
-# Vercel 处理函数
 def handler(event, context):
     """Handle Vercel serverless function invocation"""
-    if event.get('path', '').startswith('/api/'):
-        return app(event, context)
-    return app.handle_request() 
+    return create_app() 
