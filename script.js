@@ -18,8 +18,33 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
     currentPhase.innerHTML = '<i class="fas fa-globe"></i> 正在获取网页内容...';
 
     try {
-        const response = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(url));
-        const html = await response.text();
+        // 使用多个CORS代理服务，如果一个失败就尝试下一个
+        const proxyUrls = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+            `https://cors-anywhere.herokuapp.com/${url}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+        ];
+
+        let html = null;
+        let error = null;
+
+        for (const proxyUrl of proxyUrls) {
+            try {
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                html = await response.text();
+                break; // 如果成功获取到内容，跳出循环
+            } catch (e) {
+                error = e;
+                continue; // 如果失败，继续尝试下一个代理
+            }
+        }
+
+        if (!html) {
+            throw new Error('无法获取网页内容，请稍后重试。' + (error ? `\n详细错误: ${error.message}` : ''));
+        }
         
         currentPhase.innerHTML = '<i class="fas fa-search"></i> 正在分析网页内容...';
         
@@ -32,35 +57,53 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             ...Array.from(doc.getElementsByTagName('img')), // 标准图片标签
             ...Array.from(doc.querySelectorAll('[data-src]')), // 懒加载图片
             ...Array.from(doc.querySelectorAll('[data-original]')), // 一些网站使用data-original
-            ...Array.from(doc.querySelectorAll('[style*="background-image"]')) // 背景图片
+            ...Array.from(doc.querySelectorAll('[style*="background-image"]')), // 背景图片
+            ...Array.from(doc.querySelectorAll('[data-bg]')), // 一些网站使用data-bg
+            ...Array.from(doc.querySelectorAll('[data-background]')) // 一些网站使用data-background
         ];
         
         // 过滤和处理图片URL
         let imageUrls = new Set(); // 使用Set去重
         
         images.forEach(img => {
+            // 检查所有可能的图片属性
+            const possibleSources = [
+                img.src,
+                img.getAttribute('data-src'),
+                img.getAttribute('data-original'),
+                img.getAttribute('data-bg'),
+                img.getAttribute('data-background'),
+                img.getAttribute('data-image')
+            ];
+
             // 检查src属性
-            const src = img.src || img.getAttribute('data-src') || img.getAttribute('data-original');
-            if (src) {
-                try {
-                    const absoluteUrl = new URL(src, url).href;
-                    if (absoluteUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
-                        imageUrls.add(absoluteUrl);
-                    }
-                } catch (e) {}
-            }
+            possibleSources.forEach(src => {
+                if (src) {
+                    try {
+                        const absoluteUrl = new URL(src, url).href;
+                        if (absoluteUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)(\?.*)?$/i)) {
+                            imageUrls.add(absoluteUrl);
+                        }
+                    } catch (e) {}
+                }
+            });
             
             // 检查背景图片
             const style = img.getAttribute('style');
             if (style) {
-                const match = style.match(/background-image:\s*url\(['"]?([^'"()]+)['"]?\)/);
-                if (match) {
-                    try {
-                        const absoluteUrl = new URL(match[1], url).href;
-                        if (absoluteUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)) {
-                            imageUrls.add(absoluteUrl);
+                const matches = style.match(/background-image:\s*url\(['"]?([^'"()]+)['"]?\)/g);
+                if (matches) {
+                    matches.forEach(match => {
+                        const url_match = match.match(/url\(['"]?([^'"()]+)['"]?\)/);
+                        if (url_match) {
+                            try {
+                                const absoluteUrl = new URL(url_match[1], url).href;
+                                if (absoluteUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)(\?.*)?$/i)) {
+                                    imageUrls.add(absoluteUrl);
+                                }
+                            } catch (e) {}
                         }
-                    } catch (e) {}
+                    });
                 }
             }
         });
