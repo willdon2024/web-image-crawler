@@ -9,9 +9,18 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
     const progressNumbers = document.getElementById('progressNumbers');
     const currentPhase = document.getElementById('currentPhase');
     
-    // 显示加载动画
+    // 清除之前的内容和状态
     loading.style.display = 'block';
     imageGrid.innerHTML = '';
+    const existingControls = document.querySelector('.selection-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+    const existingDownloadBtn = document.querySelector('.btn-success');
+    if (existingDownloadBtn) {
+        existingDownloadBtn.remove();
+    }
+    
     progressBar.style.width = '0%';
     progressText.textContent = '准备开始...';
     progressNumbers.textContent = '0/0';
@@ -154,13 +163,14 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
             const checkboxes = imageGrid.querySelectorAll('.image-checkbox');
             const images = imageGrid.querySelectorAll('.image-item');
 
+            selectedImages.clear(); // 清除之前的选择
             checkboxes.forEach((checkbox, index) => {
-                checkbox.checked = action === 'select-all';
-                images[index].classList.toggle('image-selected', action === 'select-all');
-                if (action === 'select-all') {
-                    selectedImages.add(imageUrls[index]);
-                } else {
-                    selectedImages.delete(imageUrls[index]);
+                if (index < imageUrls.length) { // 只处理成功加载的图片
+                    checkbox.checked = action === 'select-all';
+                    images[index].classList.toggle('image-selected', action === 'select-all');
+                    if (action === 'select-all') {
+                        selectedImages.add(imageUrls[index]);
+                    }
                 }
             });
 
@@ -221,7 +231,8 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
                 });
                 img.addEventListener('error', () => {
                     updateProgress();
-                    resolve(null);
+                    resolve(null); // 加载失败返回null
+                    wrapper.remove(); // 移除加载失败的图片容器
                 });
             });
         });
@@ -229,97 +240,28 @@ document.getElementById('crawlForm').addEventListener('submit', async function(e
         const results = await Promise.all(loadPromises);
         const successUrls = results.filter(url => url !== null);
 
+        // 更新选择控制按钮的计数
+        const selectionControlsElement = document.querySelector('.selection-controls');
+        if (selectionControlsElement) {
+            const info = selectionControlsElement.querySelector('.selection-info');
+            info.textContent = `已选择: 0/${successUrls.length} 张图片`;
+        }
+
+        // 更新进度显示为实际成功加载的图片数量
+        progressBar.style.width = '100%';
+        progressText.textContent = '图片加载完成';
+        progressNumbers.textContent = `${successUrls.length}/${successUrls.length}`;
+        currentPhase.innerHTML = '<i class="fas fa-check-circle"></i> 加载完成';
+
         // 添加下载按钮
         if (successUrls.length > 0) {
             const downloadBtn = document.createElement('button');
             downloadBtn.className = 'btn btn-success';
-            downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载已选图片 (0张)`;
+            downloadBtn.innerHTML = `<i class="fas fa-download"></i> 下载已选图片 (0/${successUrls.length}张)`;
             downloadBtn.disabled = true;
             downloadBtn.style.opacity = '0.5';
-            downloadBtn.onclick = async () => {
-                if (selectedImages.size === 0) return;
-
-                const zip = new JSZip();
-                // 生成当前日期时间字符串
-                const now = new Date();
-                const dateStr = now.toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                }).replace(/\//g, '');
-                const timeStr = now.toLocaleTimeString('zh-CN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                }).replace(/:/g, '');
-                const zipFilename = `images_${dateStr}_${timeStr}.zip`;
-
-                // 创建下载进度条容器
-                const downloadProgressContainer = document.createElement('div');
-                downloadProgressContainer.className = 'progress-container mt-3';
-                downloadProgressContainer.innerHTML = `
-                    <div class="progress-phase">
-                        <i class="fas fa-download"></i> 正在打包图片...
-                    </div>
-                    <div class="progress">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             role="progressbar" style="width: 0%"></div>
-                    </div>
-                    <div class="progress-info">
-                        <span>正在下载图片</span>
-                        <span class="progress-numbers">0/${selectedImages.size}</span>
-                    </div>
-                `;
-                downloadBtn.parentNode.insertBefore(downloadProgressContainer, downloadBtn.nextSibling);
-
-                // 下载所有选中的图片并添加到zip
-                let downloadCount = 0;
-                const selectedUrlsArray = Array.from(selectedImages);
-                const updateDownloadProgress = () => {
-                    downloadCount++;
-                    const progress = (downloadCount / selectedImages.size) * 100;
-                    const progressBar = downloadProgressContainer.querySelector('.progress-bar');
-                    const progressNumbers = downloadProgressContainer.querySelector('.progress-numbers');
-                    progressBar.style.width = `${progress}%`;
-                    progressNumbers.textContent = `${downloadCount}/${selectedImages.size}`;
-                };
-
-                for (let i = 0; i < selectedUrlsArray.length; i++) {
-                    const url = selectedUrlsArray[i];
-                    try {
-                        const response = await fetch(url);
-                        const blob = await response.blob();
-                        const filename = `${dateStr}_${timeStr}/image_${(i + 1).toString().padStart(3, '0')}.${blob.type.split('/')[1]}`;
-                        zip.file(filename, blob);
-                        updateDownloadProgress();
-                    } catch (error) {
-                        console.error('下载图片失败:', url, error);
-                    }
-                }
-
-                // 更新状态为正在生成zip
-                downloadProgressContainer.querySelector('.progress-phase').innerHTML = 
-                    '<i class="fas fa-file-archive"></i> 正在生成压缩包...';
-
-                // 生成并下载zip文件
-                const content = await zip.generateAsync({type: 'blob'});
-                const downloadLink = document.createElement('a');
-                downloadLink.href = URL.createObjectURL(content);
-                downloadLink.download = zipFilename;
-                downloadLink.click();
-                URL.revokeObjectURL(downloadLink.href);
-
-                // 更新完成状态
-                downloadProgressContainer.querySelector('.progress-phase').innerHTML = 
-                    '<i class="fas fa-check"></i> 下载完成';
-            };
-            imageGrid.parentNode.insertBefore(downloadBtn, imageGrid);
+            imageGrid.parentNode.appendChild(downloadBtn);
         }
-
-        currentPhase.innerHTML = '<i class="fas fa-check-circle"></i> 加载完成';
-        progressText.textContent = '图片加载完成';
-        progressNumbers.textContent = `${successCount}/${imageUrls.length}`;
 
     } catch (error) {
         imageGrid.innerHTML = `<p class="text-center text-danger">发生错误: ${error.message}</p>`;
